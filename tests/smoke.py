@@ -40,7 +40,7 @@ def smoke(binary, version):
         extension.write_text('''
 import { getPackageDir } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 export default function (pi) {
@@ -48,10 +48,13 @@ export default function (pi) {
     JSON.parse(readFileSync(join(getPackageDir(), "theme", `${theme}.json`), "utf8"));
   }
   const nativeDir = join(getPackageDir(), "native");
-  const helpers = readdirSync(nativeDir, { recursive: true }).filter(path => path.endsWith(".node"));
-  if (helpers.length === 0) throw new Error("Missing native platform helpers");
-  const require = createRequire(join(getPackageDir(), "package.json"));
-  for (const helper of helpers) require(join(nativeDir, helper));
+  if (process.platform === "darwin" && !existsSync(nativeDir)) throw new Error("Missing macOS platform helpers");
+  if (existsSync(nativeDir)) {
+    const helpers = readdirSync(nativeDir, { recursive: true }).filter(path => path.endsWith(".node"));
+    if (helpers.length === 0) throw new Error("Missing native platform helpers");
+    const require = createRequire(join(getPackageDir(), "package.json"));
+    for (const helper of helpers) require(join(nativeDir, helper));
+  }
   if (Type.String().type !== "string") throw new Error("Extension dependency resolution failed");
   pi.registerCommand("nix-smoke", {
     description: "Nix package smoke check",
