@@ -1,0 +1,55 @@
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      revision:
+        type: string
+        default: ''
+      sources-artifact:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  platforms:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
+      - id: matrix
+        run: echo "matrix=$(jq -c '{include:[to_entries[] | {system:.key, runner:.value.runner}]}' platforms.json)" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: platforms
+    name: Check (${{ matrix.system }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.revision || github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        if: inputs.sources-artifact != ''
+        with:
+          name: ${{ inputs.sources-artifact }}
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+      - name: Check package, updater, and workflows
+        env:
+          EXPECTED_SYSTEM: ${{ matrix.system }}
+        run: |
+          test "$(nix eval --raw --impure --expr builtins.currentSystem)" = "$EXPECTED_SYSTEM"
+          nix flake check --print-build-logs
