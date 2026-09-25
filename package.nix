@@ -3,6 +3,7 @@
 , fetchurl
 , makeBinaryWrapper
 , autoPatchelfHook
+, libxcb
 , bash
 , fd
 , ripgrep
@@ -32,7 +33,8 @@ stdenv.mkDerivation {
 
   nativeBuildInputs = [ makeBinaryWrapper ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
-  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib ];
+  # Pi's bundled X11 clipboard helper links libxcb.
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ stdenv.cc.cc.lib libxcb ];
 
   installPhase = ''
     runHook preInstall
